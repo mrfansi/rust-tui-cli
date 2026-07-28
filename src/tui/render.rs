@@ -65,7 +65,18 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
     }
     render_status(f, chunks[2], app);
 
-    // Overlays, in the order they stack.
+    // Overlays, drawn bottom to top — which must be the EXACT REVERSE of the
+    // order `App::on_key` consults them, so the overlay on top is always the one
+    // receiving the keys.
+    //
+    // Get this wrong and the user sees one dialog while typing into another
+    // underneath it. Today no path opens two at once (the menu closes itself
+    // before running an action, and the picker closes before opening its form),
+    // so the two orders can drift without anything failing — which is precisely
+    // why they are stated here. Change one list, change the other.
+    //
+    //   on_key: help → confirm → form → menu → picker
+    //   here:   picker → menu → form → confirm → help
     if app.picker.is_some() {
         let rows: Vec<String> = app
             .profiles
@@ -76,12 +87,12 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
             render_list_popup(f, "Profile — Enter switch · a add", &rows, state, 60, 50);
         }
     }
-    if app.form.is_some() {
-        render_form(f, app);
-    }
     if let Some(menu) = &mut app.menu {
         let labels: Vec<String> = menu.items.iter().map(|i| i.label.clone()).collect();
         render_list_popup(f, "Actions", &labels, &mut menu.state, 44, 40);
+    }
+    if app.form.is_some() {
+        render_form(f, app);
     }
     if app.confirm.is_some() {
         render_confirm(f, app);
@@ -336,6 +347,23 @@ pub(super) fn render_table(
 ) {
     let keep = columns_that_fit(min_widths, area.width);
 
+    /// The width a column is CAPPED at, where that is knowable before layout.
+    ///
+    /// Cutting every cell at the whole table's width leaves a fixed-width column
+    /// to be clipped by the widget instead — with no ellipsis, which is the one
+    /// outcome `first_line` exists to prevent: "api-billing-prod" arriving in a
+    /// 12-wide column as "api-billing-", a name that looks complete and isn't.
+    ///
+    /// `Min` deliberately keeps the full width: it grows to fill, so cutting at
+    /// its floor would truncate text that had room to be shown.
+    fn cap(widths: &[Constraint], i: usize, table_width: usize) -> usize {
+        match widths.get(i) {
+            Some(Constraint::Length(n) | Constraint::Max(n)) => *n as usize,
+            _ => table_width,
+        }
+    }
+    let table_width = area.width.saturating_sub(4) as usize;
+
     let header = Row::new(
         keep.iter()
             .filter_map(|&i| headers.get(i).copied())
@@ -355,9 +383,9 @@ pub(super) fn render_table(
                 keep.iter()
                     .filter_map(|&i| cells.get(i).map(|c| (i, c.clone())))
                     .map(|(i, c)| {
-                        // Cut here, not at the pane edge: a clipped name reads as
-                        // a complete, shorter one.
-                        let c = first_line(&c, area.width.saturating_sub(4) as usize);
+                        // Cut here, not at the column edge: a clipped name reads
+                        // as a complete, shorter one.
+                        let c = first_line(&c, cap(widths, i, table_width));
                         match cell_style(i, &c) {
                             Some(st) => Cell::from(c).style(st),
                             None => Cell::from(c),
@@ -538,4 +566,77 @@ fn key_line(Key(key, what): &Key) -> Line<'static> {
         Span::styled(format!("  {key:<18}"), Style::default().fg(Color::Cyan)),
         Span::raw(what.to_string()),
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    fn drawn(width: u16, widths: &[Constraint], cells: Vec<String>) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, 6)).unwrap();
+        let mut state = TableState::default();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_table(
+                    f,
+                    area,
+                    " T ".into(),
+                    &["A", "B"],
+                    widths,
+                    &[0, 0],
+                    vec![cells.clone()],
+                    &mut state,
+                    |_, _| None,
+                );
+            })
+            .unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect()
+    }
+
+    /// A value too wide for its column must say so.
+    ///
+    /// The cut used to be made at the whole table's width, so a fixed-width
+    /// column was left to the widget, which clips without a mark:
+    /// "api-billing-prod" arrived as "api-billing-", a name that looks complete
+    /// and is not. Nothing on screen said a character was missing.
+    #[test]
+    fn a_value_too_wide_for_its_column_is_marked_as_cut() {
+        let out = drawn(
+            60,
+            &[Constraint::Length(12), Constraint::Min(10)],
+            vec!["api-billing-prod".into(), "ops".into()],
+        );
+        assert!(
+            out.contains("api-billing…"),
+            "the cut must be marked; got:\n{out}"
+        );
+        assert!(
+            !out.contains("api-billing-p"),
+            "and must happen at the COLUMN's width, not the table's:\n{out}"
+        );
+    }
+
+    /// `Min` grows to fill, so cutting at its floor would truncate text that had
+    /// room — the opposite mistake, and just as wrong.
+    #[test]
+    fn a_growable_column_is_not_cut_at_its_floor() {
+        let out = drawn(
+            60,
+            &[Constraint::Length(6), Constraint::Min(10)],
+            vec!["id".into(), "a-name-longer-than-ten".into()],
+        );
+        assert!(
+            out.contains("a-name-longer-than-ten"),
+            "Min(10) may be wider than 10; got:\n{out}"
+        );
+    }
 }
