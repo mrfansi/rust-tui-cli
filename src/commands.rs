@@ -12,8 +12,50 @@ use crate::config::{Profile, ProfileStore};
 use crate::output::{json_output, print_json, table};
 use crate::resource;
 
-/// The client for `--profile <name>`, or for the default profile.
+/// The environment variable prefix: the binary's name, upper-cased.
+/// `rust-tui-cli` → `RUST_TUI_CLI_URL` / `RUST_TUI_CLI_TOKEN`.
+fn env_prefix(app: &str) -> String {
+    app.to_uppercase().replace('-', "_")
+}
+
+/// A client built from the environment, for CI — where writing a credentials
+/// file onto a shared runner's disk is worse than passing it in.
+///
+/// Both variables or neither. A URL on its own would otherwise be sent the
+/// DEFAULT PROFILE'S token: a production credential aimed at a staging host, or
+/// the reverse, from a variable someone set expecting it to be ignored.
+/// Empty counts as absent, because an unset secret in CI expands to `""` rather
+/// than disappearing.
+fn env_client(app: &str) -> Option<ApiClient> {
+    let prefix = env_prefix(app);
+    let var = |suffix: &str| std::env::var(format!("{prefix}_{suffix}")).ok();
+    let (url, token) = credentials(var("URL"), var("TOKEN"))?;
+    Some(ApiClient::new(&url, &token))
+}
+
+/// The pair rule on its own, so it can be tested without setting variables that
+/// every other test in the process would also see.
+fn credentials(url: Option<String>, token: Option<String>) -> Option<(String, String)> {
+    let non_empty = |v: Option<String>| v.filter(|v| !v.is_empty());
+    match (non_empty(url), non_empty(token)) {
+        (Some(url), Some(token)) => Some((url, token)),
+        _ => None,
+    }
+}
+
+/// The client for `--profile <name>`, or from the environment, or for the
+/// default profile — in that order.
 pub fn resolve_client(store: &ProfileStore, profile: &Option<String>) -> Result<ApiClient> {
+    // An explicit `--profile` beats the environment: a flag typed on this
+    // command is a more specific statement of intent than a variable the shell
+    // happens to be carrying, and silently ignoring it would send the operation
+    // to the wrong host.
+    if profile.is_none() {
+        if let Some(client) = env_client(crate::APP_NAME) {
+            return Ok(client);
+        }
+    }
+
     let p = match profile {
         Some(name) => store.get(name).ok_or_else(|| {
             anyhow!(
@@ -21,9 +63,14 @@ pub fn resolve_client(store: &ProfileStore, profile: &Option<String>) -> Result<
                 crate::APP_NAME
             )
         })?,
-        None => store
-            .default()
-            .ok_or_else(|| anyhow!("No profiles yet. Run: {} profile add", crate::APP_NAME))?,
+        None => store.default().ok_or_else(|| {
+            anyhow!(
+                "No profiles yet. Run: {app} profile add\n\
+                 Or set {prefix}_URL and {prefix}_TOKEN.",
+                app = crate::APP_NAME,
+                prefix = env_prefix(crate::APP_NAME),
+            )
+        })?,
     };
     Ok(ApiClient::new(&p.url, &p.token))
 }
@@ -202,6 +249,30 @@ mod tests {
         assert!(!valid_name("Prod"));
         assert!(!valid_name("prod eu"));
         assert!(!valid_name("../etc"));
+    }
+
+    #[test]
+    fn the_env_var_names_come_from_the_binary_name() {
+        assert_eq!(env_prefix("rust-tui-cli"), "RUST_TUI_CLI");
+        assert_eq!(env_prefix("flyctl"), "FLYCTL");
+    }
+
+    /// Half a credential is not a credential. A URL with no token would fall
+    /// through to the default profile's token and aim it at another host.
+    #[test]
+    fn env_credentials_are_taken_only_as_a_complete_pair() {
+        let s = |v: &str| Some(v.to_string());
+        assert_eq!(
+            credentials(s("https://api"), s("tok")),
+            Some(("https://api".into(), "tok".into()))
+        );
+        assert_eq!(credentials(s("https://api"), None), None);
+        assert_eq!(credentials(None, s("tok")), None);
+        assert_eq!(credentials(None, None), None);
+        // CI expands an unset secret to an empty string rather than dropping the
+        // variable, so empty has to count as absent.
+        assert_eq!(credentials(s("https://api"), s("")), None);
+        assert_eq!(credentials(s(""), s("tok")), None);
     }
 
     #[test]
