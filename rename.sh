@@ -112,6 +112,11 @@ if command -v cargo >/dev/null 2>&1; then
 	cargo update --workspace --quiet
 fi
 
+# The template's own CI job renames a checkout and asserts the result. Here it
+# could only fail: the rename has happened and the script below is about to
+# delete itself. Removed with the script, not left to go red on the first push.
+rm -f .github/workflows/template.yml
+
 rm -f "$0"
 
 echo "Renamed $OLD -> $NEW."

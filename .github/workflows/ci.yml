@@ -57,24 +57,3 @@ jobs:
         run: rustup toolchain install ${{ steps.msrv.outputs.version }} --profile minimal --no-self-update
       - name: Build
         run: cargo +${{ steps.msrv.outputs.version }} test
-
-  # This repo is a template, so the path a new user actually takes has to be
-  # tested too — not just the path the maintainer takes.
-  rename:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Rename
-        run: ./rename.sh renamed-tool --no-commit
-      - name: The name propagated everywhere
-        run: |
-          set -eu
-          grep -q '^name = "renamed-tool"$' Cargo.toml
-          test ! -e rename.sh
-          ! grep -rn 'rust-tui-cli' Cargo.toml Cargo.lock README.md
-      - name: The renamed project still builds and tests
-        run: cargo test
-      - name: And the binary answers to its new name
-        # Block scalar: a plain one containing ": " parses as a nested mapping.
-        run: |
-          cargo run --quiet -- --help | grep -q 'Usage: renamed-tool'
