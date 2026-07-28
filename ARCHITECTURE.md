@@ -24,6 +24,17 @@ src/
     └── tests.rs   Keypress in, state out. No terminal, no server, no sleeps.
 ```
 
+Outside `src/`, the files that exist because this is a template rather than a
+project:
+
+```
+rename.sh                 renames a fresh copy, then deletes itself
+rust-toolchain.toml       stable + rustfmt + clippy, so `cargo fmt` agrees with CI
+.github/workflows/ci.yml  lint · test on 3 OSes · MSRV · rename.sh
+.github/workflows/release.yml   a v* tag → five binaries + SHA256SUMS
+CLAUDE.md                 the rules below, for an agent working in a copy
+```
+
 ## The rules that make it scale
 
 **`render` never decides.** If drawing code needs to know whether something is
@@ -116,4 +127,8 @@ about 30 lines when you need it.
 | a work queue for bulk | bulks are large AND per-item time is uneven, so chunk stragglers cost real time |
 | `App` caching of `shown()` | a list gets big enough that rebuilding rows per frame shows |
 | form wizard steps | a form has more fields than fit on a screen |
-| CI matrix / caching | something breaks on another OS, or a cold build costs more than it saves |
+| CI dependency caching | a cold build costs more than the cache does; the suite currently runs in a tenth of a second |
+| an auth trait | you need a second scheme in ONE binary. For one scheme it is a line in `send()`, and a trait with one implementation is a layer to read past |
+| a configurable timeout | an operation other than `create` legitimately runs past 30 s. `post()` already takes a per-call timeout, so this is a flag, not a redesign |
+| `cargo-generate` | `rename.sh` stops being enough — a template that has to ask more than the project's name |
+| a `rename.sh` that renames the resource too | never, most likely: it would have to edit `resource.rs`, `worker.rs`, `app.rs` and `main.rs` in step, and the recipe above is the honest version of that work |
