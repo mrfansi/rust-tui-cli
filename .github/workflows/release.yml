@@ -47,6 +47,25 @@ jobs:
         shell: bash
         run: echo "name=$(sed -n 's/^name = "\(.*\)"$/\1/p' Cargo.toml | head -1)" >> "$GITHUB_OUTPUT"
 
+      # Nothing else ties the tag to the version the binary reports. Without
+      # this, `git tag v0.2.0` on a Cargo.toml still saying 0.1.0 publishes
+      # binaries whose `--version` is a lie — and the download that proves it is
+      # the one a user already has.
+      #
+      # Skipped for a manual dispatch, which is for re-running a release whose
+      # tag already exists and already matched.
+      - name: The tag must match the version in Cargo.toml
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME#v}"
+          crate=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          if [ "$tag" != "$crate" ]; then
+            echo "::error::tag $GITHUB_REF_NAME says $tag, Cargo.toml says $crate. Bump the version, or fix the tag."
+            exit 1
+          fi
+
       - name: musl toolchain
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools

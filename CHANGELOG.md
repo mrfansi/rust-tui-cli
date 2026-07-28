@@ -13,6 +13,11 @@ follow [Semantic Versioning].
 - A test that runs `Cli::command().debug_assert()`, so a malformed clap
   definition fails in CI rather than in front of whoever adds a subcommand.
 - Releases carry the shell completions and the man page alongside the binaries.
+- `examples/fake_api.rs`: a local server answering the shape `resource.rs`
+  expects, so a fresh clone can be seen working before there is an API to point
+  it at. `httpmock` is a dev-dependency, so it costs a release build nothing.
+- The release workflow refuses a tag that disagrees with `version` in
+  `Cargo.toml`, before it builds anything.
 - `rename.sh`: renames a fresh copy of the template and deletes itself, along
   with the workflow that tests it. Covered by that workflow, so the path a new
   user takes is tested rather than assumed.
