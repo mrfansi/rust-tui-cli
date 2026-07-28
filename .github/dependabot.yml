@@ -1,0 +1,20 @@
+version: 2
+
+# Monthly, not weekly. A CLI with eleven direct dependencies does not change
+# fast enough to justify a pull request every Monday, and a bot whose pull
+# requests nobody reads is worse than no bot.
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      # One pull request for the patch-level noise, individual ones for anything
+      # that can actually break a build.
+      patch:
+        update-types: [patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
