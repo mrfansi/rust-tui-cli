@@ -6,7 +6,7 @@ A starting point for a Rust tool that is **both** a scriptable CLI and an
 interactive TUI over the same API — the architecture extracted from a
 production tool that manages hundreds of resources across many hosts.
 
-It builds, it has 77 passing tests on Linux, macOS and Windows, and
+It builds, it has 84 passing tests on Linux, macOS and Windows, and
 `cargo clippy --all-targets -- -D warnings` is clean. The demo domain is one
 resource called "item"; replacing it is the whole job.
 
@@ -69,6 +69,10 @@ is plain `cargo`, and CI tests the suite on Windows.
   never reported as a failure.
 - **CLI** — subcommands, a global `--profile` and `--json`, shell completions,
   and a man page, all generated from the same clap definitions.
+- **Full CRUD, in both halves** — list, show, create, edit and delete, from the
+  CLI *and* the TUI. An edit opens prefilled and `PATCH`es only the fields you
+  actually changed, so a form that shows four of an object's twelve fields
+  cannot erase the other eight.
 - **TUI** — tabs, a filterable table (text *or* regex), marks + bulk actions,
   an actions menu, a modal form with conditional fields, a confirmation gate on
   anything destructive, a detail viewer, and a help overlay that cannot drift
@@ -135,7 +139,7 @@ With no argument, `completions` guesses the shell from `$SHELL`.
 | `/` | filter (text or regex) |
 | `Enter` | detail |
 | `Space` | actions menu |
-| `n` | new |
+| `n` / `e` | new / edit (prefilled; only what you change is sent) |
 | `v` / `V` | mark / mark everything shown |
 | `x` | delete (marked rows, or the one under the cursor) |
 | click / right-click / wheel | select a row or tab · actions menu · scroll |

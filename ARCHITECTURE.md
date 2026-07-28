@@ -110,17 +110,17 @@ Completions and the man page follow automatically.
 ### Replace the demo resource
 
 The first thing anyone does, and the one that touches the most files: `item`
-appears on 125 lines across 13 of the 15 modules. Work outwards from the domain,
+appears on 133 lines across 13 of the 15 modules. Work outwards from the domain,
 compiling as you go — each step below leaves the tree broken until the next one,
 and the compiler names exactly what is left.
 
 | Where | What to change |
 |---|---|
-| `resource.rs` | all of it: `PATH`, `HEADERS`, `row`, `id`, `health`, `create`, `new_body` |
+| `resource.rs` | all of it: `PATH`, `HEADERS`, `row`, `id`, `health`, `create`, `new_body`, `edit_body` |
 | `main.rs` | `Command::Item`, `enum ItemCmd` and its variants' flags |
-| `commands.rs` | `item_list` · `item_get` · `item_create` · `item_delete` |
-| `tui/worker.rs` | `Req::Items` · `Resp::Items` and their arms in `handle()` |
-| `tui/app.rs` | `Screen::Items` · `TABS` · `items` · `items_row` · `open_item_menu` · `FormKind::NewItem` · the fields in `open_new_form` |
+| `commands.rs` | `item_list` · `item_get` · `item_create` · `item_set` · `item_delete` |
+| `tui/worker.rs` | `Req::Items` · `Req::Update` · `Resp::Items` and their arms in `handle()` |
+| `tui/app.rs` | `Screen::Items` · `TABS` · `items` · `items_row` · `open_item_menu` · `FormKind::NewItem` and `EditItem` · the fields in `open_new_form` and `open_edit_form` |
 | `tui/keys.rs` | `items_key` |
 | `tui/render.rs` | `render_items` · the `Screen::Items` arm of `screen_keys` · the `min_widths` for your columns |
 | `tui/tests.rs`, `client.rs`, `examples/fake_api.rs` | the fixtures and the `/items` paths |
@@ -170,6 +170,7 @@ about 30 lines when you need it.
 | a configurable timeout | an operation other than `create` legitimately runs past 30 s. `post()` already takes a per-call timeout, so this is a flag, not a redesign |
 | `cargo-generate` | `rename.sh` stops being enough — a template that has to ask more than the project's name |
 | a `rename.sh` that renames the resource too | never, most likely: it would have to edit `resource.rs`, `worker.rs`, `app.rs` and `main.rs` in step, and the recipe above is the honest version of that work |
+| pagination | your list endpoint truncates. `resource::list` reads one response and stops. Left out on purpose rather than for effort: offset/limit, cursors, `Link` headers and page tokens are four incompatible shapes, and demonstrating one would teach the wrong one to everybody else. `list` is the only function that changes |
 | a typed error for 401 | you need to branch on it. Every other status becomes an `ApiError` carrying the code; 401 alone is a plain message, because the only useful reaction to it is to show the user the sentence |
 | Unicode-aware substring filtering | your data has non-ASCII names. `FilterMatcher` lowercases with `to_ascii_lowercase`, so `É` and `é` do not match as substrings — the regex branch beside it already is Unicode-aware |
 | form fields built at runtime | a form's LABELS have to come from the API. `Field::label` is `&'static str`; the options of a `Choice` are already `String`, so live data fits today wherever it is a value rather than a name |

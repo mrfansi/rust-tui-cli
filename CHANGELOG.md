@@ -7,6 +7,19 @@ follow [Semantic Versioning].
 
 ### Added
 
+- **Update — the U that was missing from CRUD.** `client.patch`,
+  `resource::update`, an `item set` subcommand, and an "Edit…" action bound to
+  `e` in the TUI. Create, read and delete existed at every layer; update existed
+  at none, even though `profile set` proved the repo already knew updates
+  matter. `PATCH`, not `PUT`: a form showing four of an object's twelve fields
+  would otherwise send four and erase the other eight.
+- `Field` remembers the value it opened with, so an edit sends only what
+  actually changed. An absent field and an empty one stay different requests —
+  "leave the owner alone" and "clear the owner" must not collapse into one.
+- Pagination is now named in "what was left out", with the reason it is not
+  demonstrated: four incompatible shapes, and showing one teaches the wrong one
+  to everyone else.
+
 - A "Replace the demo resource" recipe in `ARCHITECTURE.md`: a file-by-file
   table of the 125 lines the name `item` reaches, and the evidence for why a
   `sed` cannot do it — `Item` is also `IntoIterator::Item`, ratatui's `ListItem`,

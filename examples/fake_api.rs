@@ -56,6 +56,13 @@ fn main() {
             .json_body(json!({ "id": "i-6", "status": "pending" }));
     });
 
+    // Answers an edit by echoing the patch back, which is what a real API does
+    // and what the TUI's reload will then overwrite with the canned list again.
+    server.mock(|when, then| {
+        when.method(PATCH).path_prefix("/items/");
+        then.status(200).json_body(json!({ "id": "i-1" }));
+    });
+
     server.mock(|when, then| {
         when.method(DELETE).path_prefix("/items/");
         then.status(204);
