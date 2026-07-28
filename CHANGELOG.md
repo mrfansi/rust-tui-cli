@@ -3,7 +3,12 @@
 Notable changes, newest first. Format follows [Keep a Changelog]; versions
 follow [Semantic Versioning].
 
-## [Unreleased]
+## [0.1.0] — 2026-07-28
+
+The first release. Everything below shipped in it: the "Fixed" entries repair
+faults in code that had never been published, so nobody was ever exposed to them
+— they are listed because the reasoning is worth keeping, not because anyone
+needs to upgrade past them.
 
 ### Added
 
@@ -57,10 +62,10 @@ follow [Semantic Versioning].
   afterwards, leaving tokens world-readable in between, and an interrupted write
   could truncate the file that holds them.
 
-## [0.1.0]
-
-- CLI + TUI boilerplate: profiles, tables, dashboard, forms, mouse support,
-  parallel bulk actions.
+- The CLI + TUI foundation itself: profiles, tables, dashboard, forms, mouse
+  support, parallel bulk actions.
+- Shell completions, a man page, and prebuilt binaries for macOS (arm64, x64),
+  Linux (gnu, musl) and Windows, published with a `SHA256SUMS`.
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html

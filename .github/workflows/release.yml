@@ -98,7 +98,7 @@ jobs:
           7z a "$stem.zip" "./target/${{ matrix.target }}/release/$name.exe"
           echo "ASSET=$stem.zip" >> "$GITHUB_ENV"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: ${{ env.ASSET }}
@@ -126,7 +126,7 @@ jobs:
           tar -czf "$asset" -C dist .
           echo "EXTRA=$asset" >> "$GITHUB_ENV"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         with:
           name: completions-and-man
@@ -141,7 +141,12 @@ jobs:
       # compromised dependency in the build push to the repository itself.
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      # v8 stopped unzipping every download and now FAILS on a digest mismatch
+      # rather than warning. Both are wanted here: each artifact is a zip
+      # envelope around one archive, so it still decompresses, and a corrupted
+      # download should stop a release rather than publish a broken asset whose
+      # checksum the same job would then compute and vouch for.
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
