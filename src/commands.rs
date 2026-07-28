@@ -13,7 +13,7 @@ use crate::output::{json_output, print_json, table};
 use crate::resource;
 
 /// The environment variable prefix: the binary's name, upper-cased.
-/// `rust-tui-cli` → `RUST_TUI_CLI_URL` / `RUST_TUI_CLI_TOKEN`.
+/// `fly-ctl` → `FLY_CTL_URL` / `FLY_CTL_TOKEN`.
 fn env_prefix(app: &str) -> String {
     app.to_uppercase().replace('-', "_")
 }
@@ -253,8 +253,9 @@ mod tests {
 
     #[test]
     fn the_env_var_names_come_from_the_binary_name() {
-        assert_eq!(env_prefix("rust-tui-cli"), "RUST_TUI_CLI");
+        assert_eq!(env_prefix("fly-ctl"), "FLY_CTL");
         assert_eq!(env_prefix("flyctl"), "FLYCTL");
+        assert_eq!(env_prefix("a-b-c"), "A_B_C");
     }
 
     /// Half a credential is not a credential. A URL with no token would fall
