@@ -178,3 +178,20 @@ fn run_tui(store: &ProfileStore, profile: &Option<String>) -> Result<()> {
     };
     tui::run(store, client, name)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// clap checks its own definition, but only in a debug build and only when
+    /// the offending path is actually run. This puts the check in the suite, so
+    /// a duplicate short flag or a required argument sitting after an optional
+    /// one is caught by CI rather than by whoever types the command next.
+    ///
+    /// Worth its four lines in a template above all: adding a subcommand is the
+    /// first thing anyone does here, and it is where those mistakes are made.
+    #[test]
+    fn the_cli_definition_is_well_formed() {
+        Cli::command().debug_assert();
+    }
+}

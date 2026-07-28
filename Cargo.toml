@@ -32,7 +32,11 @@ regex = "1"
 dialoguer = "0.11"
 
 [dev-dependencies]
+# Runs the built binary, so tests/cli.rs exercises the CLI a user actually gets
+# rather than the functions behind it.
+assert_cmd = "2"
 httpmock = "0.7"
+predicates = "3"
 tempfile = "3"
 
 [profile.release]
