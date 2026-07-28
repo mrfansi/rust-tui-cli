@@ -9,7 +9,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
+  # Lint once. Formatting and clippy give byte-identical answers on every OS,
+  # so running them three times only burns minutes.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,9 +30,51 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
+  # Tested on all three, because the code has platform-specific branches that
+  # would otherwise be claims rather than facts: KeyEventKind::Press exists for
+  # Windows' duplicate key events, and the profile store's 0600 mode is Unix-only.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
       - name: Test
         run: cargo test
 
-# Deliberately one job on one OS, and no dependency caching. Add a matrix when
-# something actually breaks on another platform, and caching when a cold build
-# starts costing more than it saves.
+  # The MSRV in Cargo.toml is a promise to anyone who builds this. Checked with
+  # exactly that toolchain, or it is only a comment.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read rust-version from Cargo.toml
+        id: msrv
+        run: echo "version=$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml)" >> "$GITHUB_OUTPUT"
+      - name: Install ${{ steps.msrv.outputs.version }}
+        run: rustup toolchain install ${{ steps.msrv.outputs.version }} --profile minimal --no-self-update
+      - name: Build
+        run: cargo +${{ steps.msrv.outputs.version }} test
+
+  # This repo is a template, so the path a new user actually takes has to be
+  # tested too — not just the path the maintainer takes.
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rename
+        run: ./rename.sh renamed-tool --no-commit
+      - name: The name propagated everywhere
+        run: |
+          set -eu
+          grep -q '^name = "renamed-tool"$' Cargo.toml
+          test ! -e rename.sh
+          ! grep -rn 'rust-tui-cli' Cargo.toml Cargo.lock README.md
+      - name: The renamed project still builds and tests
+        run: cargo test
+      - name: And the binary answers to its new name
+        # Block scalar: a plain one containing ": " parses as a nested mapping.
+        run: |
+          cargo run --quiet -- --help | grep -q 'Usage: renamed-tool'

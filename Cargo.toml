@@ -2,6 +2,9 @@
 name = "rust-tui-cli"
 version = "0.1.0"
 edition = "2021"
+# The floor ratatui 0.30 sets, verified by a CI job that builds with exactly
+# this toolchain. Raise it only when something actually needs a newer one.
+rust-version = "1.88"
 description = "Boilerplate for a Rust CLI + TUI: clap commands, ratatui dashboard, multi-profile store"
 license = "MIT"
 readme = "README.md"

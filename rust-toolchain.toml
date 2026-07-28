@@ -1,0 +1,9 @@
+# Everyone building this gets rustfmt and clippy without being told to install
+# them, and `cargo fmt` produces the same bytes here as it does in CI.
+#
+# Deliberately "stable" rather than a pinned version: a pin means every
+# contributor downloads a second toolchain, and the MSRV job already proves the
+# floor in Cargo.toml holds.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
