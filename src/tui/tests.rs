@@ -78,6 +78,43 @@ fn q_typed_into_a_filter_is_a_letter_not_a_quit() {
     assert_eq!(app.filter, "q");
 }
 
+/// A terminal shortcut must not leave its letter behind.
+///
+/// `KeyCode::Char` carries the letter whether or not Ctrl was held, so Ctrl-U —
+/// the readline habit for "clear the line" — used to insert a `u` into the very
+/// text the user was trying to clear. Same for a form field.
+#[test]
+fn a_ctrl_shortcut_does_not_type_its_letter() {
+    let (mut app, tx, _rx) = app(&[("web", "active")]);
+
+    press(&mut app, &tx, KeyCode::Char('/'));
+    typed(&mut app, &tx, "we");
+    app.on_key(
+        KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL),
+        &tx,
+    );
+    app.on_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::ALT), &tx);
+    assert_eq!(app.filter, "we", "a modifier means a command, not a letter");
+
+    // Shift is not a command: it is how a capital is typed.
+    app.on_key(KeyEvent::new(KeyCode::Char('B'), KeyModifiers::SHIFT), &tx);
+    assert_eq!(app.filter, "weB");
+
+    press(&mut app, &tx, KeyCode::Enter);
+    press(&mut app, &tx, KeyCode::Char('n'));
+    let form = app.form.as_ref().expect("n opens the new-item form");
+    assert_eq!(form.value("Name"), "");
+    app.on_key(
+        KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL),
+        &tx,
+    );
+    assert_eq!(
+        app.form.as_ref().unwrap().value("Name"),
+        "",
+        "nor into a form field"
+    );
+}
+
 #[test]
 fn mark_all_applies_to_what_the_filter_shows_and_toggles_off() {
     let (mut app, tx, _rx) = app(&[("web", "active"), ("db", "failed"), ("web-2", "active")]);

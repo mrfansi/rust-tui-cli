@@ -14,6 +14,17 @@ use super::form::FieldKind;
 use super::table::move_table;
 use super::worker::Req;
 
+/// Is this keypress a character being typed, rather than a command?
+///
+/// Ctrl and Alt make it a command, and `KeyCode::Char` carries the letter either
+/// way — so without this, Ctrl-U (the readline habit for "clear the line")
+/// inserts a `u`, and every terminal shortcut a user reaches for leaves litter in
+/// the field. Shift is NOT a command: it is how capitals are typed.
+fn is_typing(key: KeyEvent) -> bool {
+    !key.modifiers
+        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+}
+
 impl App {
     pub(super) fn on_key(&mut self, key: KeyEvent, tx: &Sender<Req>) {
         // Ctrl-C always quits, from anywhere, including mid-typing. It is the one
@@ -71,6 +82,7 @@ impl App {
             KeyCode::Enter => return self.submit_form(tx),
             _ => {}
         }
+        let typing = is_typing(key);
         let Some(form) = &mut self.form else { return };
         match key.code {
             KeyCode::Tab | KeyCode::Down => form.move_focus(1),
@@ -80,11 +92,11 @@ impl App {
             KeyCode::Backspace => form.backspace(),
             // Space picks the next option in a choice, and is an ordinary space
             // everywhere else — a name with two words must stay typeable.
-            KeyCode::Char(' ') => match form.fields.get(form.focus).map(|f| &f.kind) {
+            KeyCode::Char(' ') if typing => match form.fields.get(form.focus).map(|f| &f.kind) {
                 Some(FieldKind::Choice(_)) => form.cycle(1),
                 _ => form.type_char(' '),
             },
-            KeyCode::Char(c) => form.type_char(c),
+            KeyCode::Char(c) if typing => form.type_char(c),
             _ => {}
         }
     }
@@ -161,7 +173,7 @@ impl App {
             KeyCode::Backspace => {
                 self.filter.pop();
             }
-            KeyCode::Char(c) => self.filter.push(c),
+            KeyCode::Char(c) if is_typing(key) => self.filter.push(c),
             _ => {}
         }
         // Every keystroke changes what is shown, so the cursor must follow.
