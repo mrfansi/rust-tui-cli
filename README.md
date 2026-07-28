@@ -4,8 +4,8 @@ A starting point for a Rust tool that is **both** a scriptable CLI and an
 interactive TUI over the same API — the architecture extracted from a
 production tool that manages hundreds of resources across many hosts.
 
-It builds, it has 51 passing tests, and `cargo clippy` is clean. The demo domain
-is one resource called "item"; replacing it is the whole job.
+It builds, it has 60 passing tests, and `cargo clippy -- -D warnings` is clean.
+The demo domain is one resource called "item"; replacing it is the whole job.
 
 ```
 cargo run -- --help          # the CLI
@@ -26,8 +26,12 @@ cargo test
   an actions menu, a modal form with conditional fields, a confirmation gate on
   anything destructive, a detail viewer, and a help overlay that cannot drift
   from the real keybindings.
+- **Mouse** — click a tab or a row, right-click for the actions menu, wheel to
+  scroll. Ignored entirely while a confirmation is up.
 - **Networking off the UI thread** — two lanes (user actions, background
-  polling) so a slow API never freezes the interface.
+  polling) so a slow API never freezes the interface, and bulk actions fan out
+  across scoped threads instead of one round trip at a time.
+- **CI** — `fmt --check`, `clippy -D warnings`, and `test` on push and PR.
 
 ## Make it yours
 
@@ -56,13 +60,14 @@ second resource.
 | `n` | new |
 | `v` / `V` | mark / mark everything shown |
 | `x` | delete (marked rows, or the one under the cursor) |
+| click / right-click / wheel | select a row or tab · actions menu · scroll |
 
 ## Deliberately not included
 
-No async runtime (blocking reqwest on worker threads is enough and far simpler),
-no logging framework, no mouse support, no config file beyond the profile store,
-no multi-step form wizard, no CI workflow. Each is a few lines away when you
-actually need it — see ARCHITECTURE.md.
+No async runtime (blocking reqwest on scoped threads covers even the bulk
+fan-out, and far more simply), no logging framework, no config file beyond the
+profile store, no multi-step form wizard. Each is a few lines away when you
+actually need it — ARCHITECTURE.md lists what triggers each one.
 
 ## Licence
 

@@ -22,7 +22,9 @@ mod tests;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use ratatui::crossterm::event::{self, Event, KeyEventKind};
+use ratatui::crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind,
+};
 
 use crate::client::ApiClient;
 use crate::config::ProfileStore;
@@ -47,11 +49,26 @@ pub fn run(store: &ProfileStore, client: ApiClient, profile_name: String) -> Res
 
     let mut app = App::new(profile_name, profiles);
     let mut terminal = ratatui::init();
+    set_mouse(true);
     let result = event_loop(&mut terminal, &mut app, store, client);
     // Restore the terminal even when the loop failed: a tool that leaves the
     // terminal in raw mode after an error has broken the shell it was run from.
+    set_mouse(false);
     ratatui::restore();
     result
+}
+
+/// Capture mouse events (tab and row clicks, the wheel).
+///
+/// Side effect worth knowing about: while this is on, the terminal's own text
+/// selection is disabled — most emulators fall back to Shift+drag for copying.
+fn set_mouse(on: bool) {
+    let mut out = std::io::stdout();
+    let _ = if on {
+        ratatui::crossterm::execute!(out, EnableMouseCapture)
+    } else {
+        ratatui::crossterm::execute!(out, DisableMouseCapture)
+    };
 }
 
 /// Should the status line revert to "Ready" now?
@@ -109,12 +126,12 @@ fn event_loop(
         // like an animation rather than a stutter.
         let poll = if app.animating() { 70 } else { 120 };
         if event::poll(Duration::from_millis(poll))? {
-            if let Event::Key(key) = event::read()? {
+            match event::read()? {
                 // Windows sends a Release for every Press; acting on both runs
                 // every action twice.
-                if key.kind == KeyEventKind::Press {
-                    app.on_key(key, &w.user);
-                }
+                Event::Key(key) if key.kind == KeyEventKind::Press => app.on_key(key, &w.user),
+                Event::Mouse(m) => app.on_mouse(m, &w.user),
+                _ => {}
             }
         }
 

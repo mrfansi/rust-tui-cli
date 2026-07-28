@@ -42,7 +42,19 @@ event loop performs it. The drawing half never sees a credential.
 
 **Two worker lanes.** `user` carries what was just pressed; `poll` carries the
 background refresh. One lane would make a two-second tick queue ahead of a
-delete the user is watching for.
+delete the user is watching for. Within one request, a bulk fans out over
+`std::thread::scope` bounded by `BULK_CONCURRENCY` — parallel because the round
+trips are independent, bounded because 200 open connections at one host is an
+attack, and scoped threads because the blocking client can simply be borrowed.
+
+**The renderer owns the tab geometry.** `render_tabs` sets explicit padding and
+divider and records each tab's span in `app.tab_spans`, so a click maps back to
+a tab through arithmetic this repo controls rather than a guess at the widget's
+defaults. `select_row_at` adds `TableState::offset()` for the same reason — skip
+it and every click past the first screenful selects the wrong row.
+
+**The mouse cannot answer a question.** `on_mouse` returns immediately while any
+overlay is open. A deletion that a stray click could confirm is not confirmed.
 
 **A timeout is not a failure.** `gave_up_waiting()` separates "the server
 refused" (a real failure) from "we stopped waiting" (the operation may well have
@@ -99,9 +111,9 @@ about 30 lines when you need it.
 
 | Left out | Add it when |
 |---|---|
-| async runtime | you need many concurrent requests per action; blocking + threads covers everything else |
+| async runtime | blocking + scoped threads stops being enough; it already covers the bulk fan-out |
 | logging framework | you need diagnostics from users' machines |
-| mouse support | your tables get deep enough that clicking beats arrowing |
+| a work queue for bulk | bulks are large AND per-item time is uneven, so chunk stragglers cost real time |
 | `App` caching of `shown()` | a list gets big enough that rebuilding rows per frame shows |
 | form wizard steps | a form has more fields than fit on a screen |
-| CI workflow | the repo has more than one contributor |
+| CI matrix / caching | something breaks on another OS, or a cold build costs more than it saves |

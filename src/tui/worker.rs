@@ -136,21 +136,53 @@ fn handle(client: &ApiClient, req: Req) -> Resp {
     }
 }
 
+/// How many deletes are in flight at once.
+///
+/// Bounded rather than one thread per id: a bulk of 200 would open 200
+/// connections at a host that is usually the one thing everything else depends
+/// on. Eight hides the latency without looking like an attack.
+const BULK_CONCURRENCY: usize = 8;
+
 /// Delete each id, and report what actually happened to each one.
 ///
 /// A partial failure is the normal case in bulk. Reporting only "done" would
 /// leave rows the user believes are gone — and reporting only "failed" would
 /// hide the ones that really were deleted.
+///
+/// Run in parallel because these are independent round trips: sequentially, 20
+/// deletes against a slow host cost 20× the latency for no reason. Scoped
+/// threads, not an async runtime — the client is already blocking, and borrowing
+/// it here needs nothing more.
 fn delete_many(client: &ApiClient, ids: Vec<String>) -> Resp {
     let total = ids.len();
-    let failed: Vec<String> = ids
-        .iter()
-        .filter_map(|id| {
-            resource::delete(client, id)
-                .err()
-                .map(|e| format!("{id}: {e}"))
-        })
-        .collect();
+    let mut failed: Vec<String> = Vec::new();
+
+    // ponytail: chunked, so each round waits for its slowest member. A shared
+    // work queue would keep every slot busy — worth it only once bulks are large
+    // AND per-item time is uneven.
+    for chunk in ids.chunks(BULK_CONCURRENCY) {
+        std::thread::scope(|scope| {
+            let running: Vec<_> = chunk
+                .iter()
+                .map(|id| {
+                    scope.spawn(move || {
+                        resource::delete(client, id)
+                            .err()
+                            .map(|e| format!("{id}: {e}"))
+                    })
+                })
+                .collect();
+            for handle in running {
+                match handle.join() {
+                    Ok(Some(why)) => failed.push(why),
+                    Ok(None) => {}
+                    // A panicked worker must not disappear from the count: the
+                    // user would be told the bulk was smaller than it was.
+                    Err(_) => failed.push("a delete panicked".into()),
+                }
+            }
+        });
+    }
 
     match (failed.len(), total) {
         (0, 1) => Resp::ok("Deleted", true),
@@ -160,5 +192,74 @@ fn delete_many(client: &ApiClient, ids: Vec<String>) -> Resp {
             format!("{n} of {total} failed — {}", failed.join("; ")),
             true,
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use httpmock::prelude::*;
+
+    /// A host that refuses exactly one of the ids.
+    fn server_refusing(id: &str) -> MockServer {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(DELETE).path(format!("/items/{id}"));
+            then.status(403)
+                .json_body(serde_json::json!({ "message": "Forbidden" }));
+        });
+        server.mock(|when, then| {
+            when.method(DELETE);
+            then.status(200)
+                .json_body(serde_json::json!({ "ok": true }));
+        });
+        server
+    }
+
+    #[test]
+    fn a_partial_bulk_names_what_failed_and_still_asks_for_a_reload() {
+        // The rows that DID delete are gone from the server, so a screen that
+        // isn't reloaded is showing things that no longer exist.
+        let server = server_refusing("i-2");
+        let client = ApiClient::new(&server.base_url(), "t");
+        let ids = ["i-1", "i-2", "i-3"].map(String::from).to_vec();
+
+        let Resp::Done {
+            message,
+            error,
+            reload,
+        } = delete_many(&client, ids)
+        else {
+            panic!("a bulk delete always answers with Done");
+        };
+        assert!(error);
+        assert!(reload, "two of them really are gone");
+        assert!(message.starts_with("1 of 3 failed"), "{message}");
+        assert!(
+            message.contains("i-2"),
+            "the user needs to know WHICH: {message}"
+        );
+    }
+
+    #[test]
+    fn every_id_is_attempted_even_past_the_concurrency_limit() {
+        // Chunking is an implementation detail; a bulk larger than one chunk
+        // must still delete every single id.
+        let server = MockServer::start();
+        let all = server.mock(|when, then| {
+            when.method(DELETE);
+            then.status(200)
+                .json_body(serde_json::json!({ "ok": true }));
+        });
+        let client = ApiClient::new(&server.base_url(), "t");
+        let n = BULK_CONCURRENCY * 2 + 3;
+        let ids: Vec<String> = (0..n).map(|i| format!("i-{i}")).collect();
+
+        let Resp::Done { message, error, .. } = delete_many(&client, ids) else {
+            panic!("a bulk delete always answers with Done");
+        };
+        assert!(!error, "{message}");
+        assert_eq!(message, format!("Deleted {n}"));
+        all.assert_hits(n);
     }
 }

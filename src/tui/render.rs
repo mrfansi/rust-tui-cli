@@ -9,7 +9,7 @@ use ratatui::widgets::{
 use crate::output::{field, first_line};
 use crate::resource::{self, Health};
 
-use super::app::{App, Screen, TABS};
+use super::app::{App, Screen, TABS, TAB_SCREENS};
 use super::form::FieldKind;
 use super::table::columns_that_fit;
 
@@ -93,13 +93,28 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
 
 // ---------- Chrome ----------
 
-fn render_tabs(f: &mut Frame, area: Rect, app: &App) {
-    let titles: Vec<Line> = TABS
+fn render_tabs(f: &mut Frame, area: Rect, app: &mut App) {
+    let labels: Vec<String> = TABS
         .iter()
         .enumerate()
-        .map(|(i, t)| Line::from(format!(" {}·{t} ", i + 1)))
+        .map(|(i, t)| format!(" {}·{t} ", i + 1))
         .collect();
-    let tabs = ratatui::widgets::Tabs::new(titles)
+
+    // The geometry is spelled out — no padding, an explicit one-column divider —
+    // so a click can be mapped back to a tab from arithmetic this file owns,
+    // rather than from a guess at the widget's defaults.
+    let mut x = area.x + 1; // inside the block's border
+    app.tab_spans.clear();
+    for (i, label) in labels.iter().enumerate() {
+        let width = label.chars().count() as u16;
+        app.tab_spans.push((x, x + width, TAB_SCREENS[i]));
+        x += width + 1;
+    }
+    app.tab_row = area.y + 1;
+
+    let tabs = ratatui::widgets::Tabs::new(labels)
+        .padding("", "")
+        .divider("│")
         .select(app.screen.index())
         .highlight_style(
             Style::default()

@@ -7,6 +7,7 @@ use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::time::Instant;
 
+use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 use ratatui::widgets::{ListState, TableState};
 use serde_json::Value;
@@ -142,6 +143,12 @@ pub(super) struct App {
 
     /// Where the table was drawn, so a click can be mapped to a row.
     pub(super) table_area: Rect,
+    /// Each tab's horizontal span and the screen it leads to, recorded at render
+    /// time. Computed there because that is the only place that knows how wide
+    /// the labels came out.
+    pub(super) tab_spans: Vec<(u16, u16, Screen)>,
+    /// The row the tab labels sit on.
+    pub(super) tab_row: u16,
     pub(super) spinner: usize,
     last_tick: Instant,
 }
@@ -180,6 +187,8 @@ impl App {
             refresh_inflight: false,
             quit: false,
             table_area: Rect::default(),
+            tab_spans: Vec::new(),
+            tab_row: 0,
             spinner: 0,
             last_tick: Instant::now(),
         }
@@ -453,6 +462,94 @@ impl App {
         let mut state = ListState::default();
         state.select(Some(at));
         self.picker = Some(state);
+    }
+
+    pub(super) fn overlay_open(&self) -> bool {
+        self.help
+            || self.confirm.is_some()
+            || self.menu.is_some()
+            || self.form.is_some()
+            || self.picker.is_some()
+    }
+
+    // ---------- Mouse ----------
+
+    pub(super) fn on_mouse(&mut self, m: MouseEvent, _tx: &Sender<Req>) {
+        // While an overlay is up the mouse does nothing at all. A confirmation
+        // that a stray click could answer is not a confirmation, and the click
+        // that opened a menu is often followed by an accidental second one.
+        if self.overlay_open() {
+            return;
+        }
+        match m.kind {
+            MouseEventKind::ScrollUp => self.scroll(-3),
+            MouseEventKind::ScrollDown => self.scroll(3),
+            MouseEventKind::Down(button) => self.click(button, m.column, m.row),
+            _ => {}
+        }
+    }
+
+    fn click(&mut self, button: MouseButton, column: u16, row: u16) {
+        if button == MouseButton::Left {
+            if let Some(screen) = self.tab_at(column, row) {
+                self.screen = screen;
+                return;
+            }
+        }
+        // Selecting comes first for BOTH buttons, so the menu a right-click
+        // opens is about the row under the pointer rather than about wherever
+        // the keyboard cursor happened to be left.
+        if self.select_row_at(row) && button == MouseButton::Right {
+            self.open_item_menu();
+        }
+    }
+
+    fn tab_at(&self, column: u16, row: u16) -> Option<Screen> {
+        if row != self.tab_row {
+            return None;
+        }
+        self.tab_spans
+            .iter()
+            .find(|(start, end, _)| (*start..*end).contains(&column))
+            .map(|(_, _, screen)| *screen)
+    }
+
+    /// Select the row drawn at screen row `row`. Returns whether there was one.
+    fn select_row_at(&mut self, row: u16) -> bool {
+        if self.screen != Screen::Items {
+            return false;
+        }
+        let area = self.table_area;
+        // The first data row sits below the border AND the header; the last one
+        // above the bottom border. A click on either border is not a row.
+        let first = area.y + 2;
+        if row < first || row + 1 >= area.y + area.height {
+            return false;
+        }
+        // Add the table's own scroll offset, or every click past the first
+        // screenful selects the wrong row.
+        let at = (row - first) as usize + self.items_row.offset();
+        if at >= self.shown().len() {
+            return false;
+        }
+        self.items_row.select(Some(at));
+        true
+    }
+
+    fn scroll(&mut self, delta: isize) {
+        if let (Screen::Viewer, Some(viewer)) = (self.screen, &mut self.viewer) {
+            let max = viewer.lines.len().saturating_sub(1) as u16;
+            viewer.scroll = viewer.scroll.saturating_add_signed(delta as i16).min(max);
+            return;
+        }
+        let len = self.shown().len();
+        if len == 0 {
+            return;
+        }
+        let at = self.items_row.selected().unwrap_or(0) as isize;
+        self.items_row.select(Some(
+            at.saturating_add(delta).clamp(0, len as isize - 1) as usize
+        ));
     }
 
     // ---------- Responses ----------

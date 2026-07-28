@@ -7,7 +7,9 @@
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use serde_json::json;
 
 use super::app::{App, Screen};
@@ -234,6 +236,138 @@ fn adding_a_profile_is_handed_to_the_event_loop_and_the_name_is_checked_first() 
             "secret-token".to_string()
         ))
     );
+}
+
+// ---------- Mouse ----------
+
+/// Give the App the geometry that `render` would have recorded.
+fn laid_out(app: &mut App) {
+    app.tab_row = 1;
+    app.tab_spans = vec![(1, 13, Screen::Dashboard), (14, 24, Screen::Items)];
+    // A table at y=3, 10 rows tall: border, header, then data from y=5.
+    app.table_area = ratatui::layout::Rect::new(0, 3, 100, 10);
+}
+
+fn click(app: &mut App, tx: &Sender<Req>, button: MouseButton, column: u16, row: u16) {
+    app.on_mouse(
+        MouseEvent {
+            kind: MouseEventKind::Down(button),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        },
+        tx,
+    );
+}
+
+fn wheel(app: &mut App, tx: &Sender<Req>, kind: MouseEventKind) {
+    app.on_mouse(
+        MouseEvent {
+            kind,
+            column: 10,
+            row: 6,
+            modifiers: KeyModifiers::NONE,
+        },
+        tx,
+    );
+}
+
+#[test]
+fn clicking_a_tab_goes_to_it() {
+    let (mut app, tx, _rx) = app(&[]);
+    laid_out(&mut app);
+    click(&mut app, &tx, MouseButton::Left, 5, 1);
+    assert_eq!(app.screen, Screen::Dashboard);
+    click(&mut app, &tx, MouseButton::Left, 18, 1);
+    assert_eq!(app.screen, Screen::Items);
+    // The divider between two tabs belongs to neither.
+    click(&mut app, &tx, MouseButton::Left, 13, 1);
+    assert_eq!(app.screen, Screen::Items, "unchanged");
+}
+
+#[test]
+fn clicking_a_row_selects_that_row_and_not_another() {
+    let (mut app, tx, _rx) = app(&[("web", "active"), ("db", "failed"), ("cache", "active")]);
+    laid_out(&mut app);
+    // y=5 is the first DATA row: the border and the header sit above it. Off by
+    // one here and every click selects the row above the one pointed at.
+    click(&mut app, &tx, MouseButton::Left, 10, 5);
+    assert_eq!(app.selected_id().as_deref(), Some("web"));
+    click(&mut app, &tx, MouseButton::Left, 10, 7);
+    assert_eq!(app.selected_id().as_deref(), Some("cache"));
+}
+
+#[test]
+fn clicking_the_chrome_or_past_the_last_row_selects_nothing_new() {
+    let (mut app, tx, _rx) = app(&[("web", "active")]);
+    laid_out(&mut app);
+    click(&mut app, &tx, MouseButton::Left, 10, 5);
+    assert_eq!(app.selected_id().as_deref(), Some("web"));
+
+    for row in [3, 4, 8, 12] {
+        // border, header, empty space below the data, bottom border
+        click(&mut app, &tx, MouseButton::Left, 10, row);
+        assert_eq!(
+            app.selected_id().as_deref(),
+            Some("web"),
+            "row {row} is not a data row"
+        );
+    }
+}
+
+#[test]
+fn a_right_click_selects_the_row_it_landed_on_before_opening_the_menu() {
+    // Otherwise the menu is about wherever the keyboard cursor happened to be,
+    // and "Delete…" means a different row than the one pointed at.
+    let (mut app, tx, _rx) = app(&[("web", "active"), ("db", "failed")]);
+    laid_out(&mut app);
+    click(&mut app, &tx, MouseButton::Right, 10, 6);
+    assert_eq!(app.selected_id().as_deref(), Some("db"));
+    assert!(app.menu.is_some());
+}
+
+#[test]
+fn the_mouse_cannot_answer_a_confirmation() {
+    // A deletion must never be one stray click away.
+    let (mut app, tx, rx) = app(&[("web", "active")]);
+    laid_out(&mut app);
+    press(&mut app, &tx, KeyCode::Char('x'));
+    assert!(app.confirm.is_some());
+
+    click(&mut app, &tx, MouseButton::Left, 10, 5);
+    wheel(&mut app, &tx, MouseEventKind::ScrollDown);
+    assert!(app.confirm.is_some(), "still waiting for a real answer");
+    assert!(rx.try_recv().is_err(), "and nothing was sent");
+}
+
+#[test]
+fn the_wheel_moves_the_selection_and_stops_at_the_ends() {
+    let (mut app, tx, _rx) = app(&[("a", "active"), ("b", "active"), ("c", "active")]);
+    laid_out(&mut app);
+    wheel(&mut app, &tx, MouseEventKind::ScrollDown);
+    assert_eq!(
+        app.selected_id().as_deref(),
+        Some("c"),
+        "3 rows, 3 clicks down"
+    );
+    wheel(&mut app, &tx, MouseEventKind::ScrollDown);
+    assert_eq!(app.selected_id().as_deref(), Some("c"), "no wrapping");
+    wheel(&mut app, &tx, MouseEventKind::ScrollUp);
+    assert_eq!(app.selected_id().as_deref(), Some("a"));
+}
+
+#[test]
+fn the_wheel_scrolls_the_viewer_rather_than_a_table_behind_it() {
+    let (mut app, tx, _rx) = app(&[("web", "active")]);
+    laid_out(&mut app);
+    app.handle(
+        Resp::Detail("web".into(), json!({ "a": 1, "b": 2, "c": 3 })),
+        &tx,
+    );
+    wheel(&mut app, &tx, MouseEventKind::ScrollDown);
+    assert_eq!(app.viewer.as_ref().unwrap().scroll, 3);
+    wheel(&mut app, &tx, MouseEventKind::ScrollUp);
+    assert_eq!(app.viewer.as_ref().unwrap().scroll, 0);
 }
 
 #[test]

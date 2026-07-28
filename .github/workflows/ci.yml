@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No toolchain action: GitHub's runners already ship stable Rust with
+      # clippy and rustfmt. One fewer third-party action in the path between a
+      # commit and a green tick.
+      - name: Toolchain
+        run: rustup --version && cargo --version && rustc --version
+
+      - name: Format
+        run: cargo fmt --check
+
+      # -D warnings, because a warning nobody has to fix is a warning everybody
+      # learns to scroll past.
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
+
+# Deliberately one job on one OS, and no dependency caching. Add a matrix when
+# something actually breaks on another platform, and caching when a cold build
+# starts costing more than it saves.
