@@ -1,10 +1,12 @@
 # rust-tui-cli
 
+[![CI](https://github.com/mrfansi/rust-tui-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/mrfansi/rust-tui-cli/actions/workflows/ci.yml)
+
 A starting point for a Rust tool that is **both** a scriptable CLI and an
 interactive TUI over the same API — the architecture extracted from a
 production tool that manages hundreds of resources across many hosts.
 
-It builds, it has 66 passing tests on Linux, macOS and Windows, and
+It builds, it has 74 passing tests on Linux, macOS and Windows, and
 `cargo clippy --all-targets -- -D warnings` is clean. The demo domain is one
 resource called "item"; replacing it is the whole job.
 
@@ -70,6 +72,28 @@ decision, not a substitution: `ARCHITECTURE.md` has the recipe.
 
 `ARCHITECTURE.md` has the module map and the recipe for adding a screen or a
 second resource.
+
+## Completions and the man page
+
+Both are generated from the same clap definitions as `--help`, so they cannot
+document a command that does not exist. A release ships them prebuilt; from a
+checkout:
+
+```sh
+# zsh — anywhere on $fpath
+cargo run -- completions zsh > ~/.zfunc/_rust-tui-cli
+
+# bash
+cargo run -- completions bash > ~/.local/share/bash-completion/completions/rust-tui-cli
+
+# fish
+cargo run -- completions fish > ~/.config/fish/completions/rust-tui-cli.fish
+
+# man page
+cargo run -- man > ~/.local/share/man/man1/rust-tui-cli.1
+```
+
+With no argument, `completions` guesses the shell from `$SHELL`.
 
 ## Keys
 

@@ -70,6 +70,13 @@ replace() {
 replace Cargo.toml
 replace README.md
 
+# The CI badge points at the template's own repository. Substituting the name
+# would rewrite only half that URL and leave the original owner, producing a
+# badge for a repository nobody owns — worse than no badge. Dropped; add your
+# own once yours is pushed.
+sed '/actions\/workflows\/ci\.yml\/badge\.svg/d' README.md >README.md.rename.tmp &&
+	mv README.md.rename.tmp README.md
+
 # The template's own description and keywords ("boilerplate", "template") stop
 # being true the moment this is a real project, and all three fields matter only
 # to crates.io. Dropped rather than replaced with a placeholder: cargo names
