@@ -170,3 +170,7 @@ about 30 lines when you need it.
 | a configurable timeout | an operation other than `create` legitimately runs past 30 s. `post()` already takes a per-call timeout, so this is a flag, not a redesign |
 | `cargo-generate` | `rename.sh` stops being enough — a template that has to ask more than the project's name |
 | a `rename.sh` that renames the resource too | never, most likely: it would have to edit `resource.rs`, `worker.rs`, `app.rs` and `main.rs` in step, and the recipe above is the honest version of that work |
+| a typed error for 401 | you need to branch on it. Every other status becomes an `ApiError` carrying the code; 401 alone is a plain message, because the only useful reaction to it is to show the user the sentence |
+| Unicode-aware substring filtering | your data has non-ASCII names. `FilterMatcher` lowercases with `to_ascii_lowercase`, so `É` and `é` do not match as substrings — the regex branch beside it already is Unicode-aware |
+| form fields built at runtime | a form's LABELS have to come from the API. `Field::label` is `&'static str`; the options of a `Choice` are already `String`, so live data fits today wherever it is a value rather than a name |
+| a distinct exit code for a cancelled prompt | you script the interactive path. Answering "no" to a confirmation exits 0, the same as success — reachable only without `--yes`, and without a TTY the prompt errors out anyway |
