@@ -101,6 +101,18 @@ impl ApiClient {
         )
     }
 
+    /// PATCH, on the global timeout.
+    ///
+    /// PATCH rather than PUT, and it is the difference between an edit and a
+    /// data-loss bug: PUT replaces the whole object, so a form that shows four
+    /// of an object's twelve fields would send back four and silently erase the
+    /// other eight. PATCH sends only what changed. An API that speaks only PUT
+    /// needs `get` first, the change merged in, and the whole thing sent — one
+    /// line here, but a decision worth making on purpose.
+    pub fn patch(&self, path: &str, body: Value) -> Result<Value> {
+        self.send(self.http.patch(self.endpoint(path)).json(&body), None)
+    }
+
     pub fn delete(&self, path: &str) -> Result<Value> {
         self.send(self.http.delete(self.endpoint(path)), None)
     }

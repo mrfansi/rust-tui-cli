@@ -116,6 +116,44 @@ pub fn new_body(name: &str, kind: &str, owner: &str, image: Option<&str>) -> Val
     body
 }
 
+/// Change an existing object. The body carries ONLY the fields being changed —
+/// see `edit_body` and `ApiClient::patch` for why that matters.
+pub fn update(client: &ApiClient, id: &str, body: Value) -> Result<Value> {
+    client.patch(&format!("{PATH}/{id}"), body)
+}
+
+/// The body for an edit: the fields the caller actually supplied, and nothing
+/// else.
+///
+/// An absent field and a field set to "" are different requests — the first
+/// leaves the value alone, the second clears it. Building the body from
+/// `Option`s keeps that distinction all the way to the wire, where a struct with
+/// `String` defaults would quietly turn "I didn't touch the owner" into "set the
+/// owner to empty".
+///
+/// Which fields are editable is a domain question, not a form question: `kind`
+/// and `image` are absent here because they describe how this object was made,
+/// and the demo API cannot remake it.
+pub fn edit_body(name: Option<&str>, owner: Option<&str>) -> Value {
+    let mut body = serde_json::Map::new();
+    if let Some(name) = name {
+        body.insert("name".into(), json!(name));
+    }
+    if let Some(owner) = owner {
+        body.insert("owner".into(), json!(owner));
+    }
+    Value::Object(body)
+}
+
+/// Are there any changes to send?
+///
+/// Asked here rather than at each call site: the CLI and the TUI must agree on
+/// what "nothing changed" means, and an empty PATCH is a round trip that can
+/// only fail or do nothing.
+pub fn is_empty_edit(body: &Value) -> bool {
+    body.as_object().is_none_or(serde_json::Map::is_empty)
+}
+
 pub fn delete(client: &ApiClient, id: &str) -> Result<Value> {
     client.delete(&format!("{PATH}/{id}"))
 }
@@ -150,6 +188,44 @@ mod tests {
         assert_eq!(filtered(&items, "failed").len(), 1);
         assert_eq!(filtered(&items, "ops")[0]["id"], "i-1");
         assert_eq!(filtered(&items, "").len(), 2);
+    }
+
+    /// An absent field and an empty one are different requests. Sending a field
+    /// the user did not touch is how an edit form clears a value nobody meant to
+    /// change — the reason the body is built from `Option`s at all.
+    #[test]
+    fn an_edit_carries_only_the_fields_it_was_given() {
+        assert_eq!(edit_body(Some("web"), None), json!({ "name": "web" }));
+        assert_eq!(edit_body(None, Some("ops")), json!({ "owner": "ops" }));
+        assert_eq!(
+            edit_body(Some("web"), Some("ops")),
+            json!({ "name": "web", "owner": "ops" })
+        );
+        // Explicitly emptying a field is a real change, not "leave it alone".
+        assert_eq!(edit_body(None, Some("")), json!({ "owner": "" }));
+
+        assert!(is_empty_edit(&edit_body(None, None)));
+        assert!(!is_empty_edit(&edit_body(None, Some(""))));
+    }
+
+    #[test]
+    fn an_update_patches_the_object_at_its_own_path() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(PATCH)
+                .path("/items/i-1")
+                // Only the changed field on the wire: a PATCH carrying the whole
+                // object would overwrite the fields the form never showed.
+                .json_body(json!({ "owner": "data" }));
+            then.status(200)
+                .json_body(json!({ "id": "i-1", "owner": "data" }));
+        });
+
+        let client = ApiClient::new(&server.base_url(), "t");
+        let out = update(&client, "i-1", edit_body(None, Some("data"))).unwrap();
+
+        mock.assert();
+        assert_eq!(out["owner"], "data");
     }
 
     #[test]
