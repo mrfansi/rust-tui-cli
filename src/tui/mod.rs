@@ -50,6 +50,7 @@ pub fn run(store: &ProfileStore, client: ApiClient, profile_name: String) -> Res
     let mut app = App::new(profile_name, profiles);
     let mut terminal = ratatui::init();
     set_mouse(true);
+    restore_mouse_on_panic();
     let result = event_loop(&mut terminal, &mut app, store, client);
     // Restore the terminal even when the loop failed: a tool that leaves the
     // terminal in raw mode after an error has broken the shell it was run from.
@@ -62,6 +63,25 @@ pub fn run(store: &ProfileStore, client: ApiClient, profile_name: String) -> Res
 ///
 /// Side effect worth knowing about: while this is on, the terminal's own text
 /// selection is disabled — most emulators fall back to Shift+drag for copying.
+/// Turn mouse capture back off if we panic.
+///
+/// `ratatui::init()` already installs a hook, but it only leaves raw mode and
+/// the alternate screen. Mouse capture was switched on *here*, so nothing else
+/// switches it off — and a terminal left capturing the mouse answers every
+/// click with an escape sequence until the user runs `reset`. That is the same
+/// broken-shell-after-a-crash this file's error path is careful to avoid.
+///
+/// Installed AFTER `ratatui::init()` and chained rather than replacing: ours
+/// disables the mouse, then ratatui's restores the terminal, then the default
+/// one prints the panic. Replacing the hook would lose the other two.
+fn restore_mouse_on_panic() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        set_mouse(false);
+        previous(info);
+    }));
+}
+
 fn set_mouse(on: bool) {
     let mut out = std::io::stdout();
     let _ = if on {
