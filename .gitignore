@@ -1,1 +1,9 @@
 /target
+
+# Agent/session artefacts. They are specific to one machine and one session, and
+# a template that carries them hands every new project someone else's state.
+/.omc/
+/graphify-out/
+/.claude/settings.local.json
+
+.DS_Store
