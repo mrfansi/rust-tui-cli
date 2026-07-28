@@ -38,7 +38,7 @@ jobs:
             os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Read from Cargo.toml, not hard-coded, so this workflow still works after
       # rename.sh has been run on a copy of this template.
