@@ -29,6 +29,15 @@ pub(super) enum Req {
         name: String,
         body: Value,
     },
+    /// Change one object. The body carries only the fields that differ — see
+    /// `resource::edit_body`.
+    ///
+    /// Not a bulk, unlike Delete: "delete these twelve" is one intention, while
+    /// "set these twelve to the same name" is not an operation anyone wants.
+    Update {
+        id: String,
+        body: Value,
+    },
     /// One id or many. Bulk is a client-side fan-out over the single-item call,
     /// so each target can fail on its own and be reported on its own.
     Delete(Vec<String>),
@@ -130,6 +139,17 @@ fn handle(client: &ApiClient, req: Req) -> Resp {
                 true,
             ),
             Err(e) => Resp::err(format!("Create failed: {e}"), false),
+        },
+
+        Req::Update { id, body } => match resource::update(client, &id, body) {
+            Ok(_) => Resp::ok(format!("Updated {id}"), true),
+            // Same reasoning as Create: the change may well have landed, and
+            // "failed" would invite the user to make it twice.
+            Err(e) if gave_up_waiting(&e) => Resp::ok(
+                format!("{id}: stopped waiting for an answer — check the row"),
+                true,
+            ),
+            Err(e) => Resp::err(format!("Update failed: {e}"), false),
         },
 
         Req::Delete(ids) => delete_many(client, ids),

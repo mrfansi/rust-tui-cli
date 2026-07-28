@@ -363,6 +363,40 @@ impl App {
         ));
     }
 
+    /// Edit the selected row, prefilled with what it currently holds.
+    ///
+    /// Prefilled from the row already on screen rather than from a fresh `GET`:
+    /// that row is what the user looked at and decided to change. A re-fetch
+    /// could answer with something newer and put the user's edit on top of a
+    /// value they never saw.
+    pub(super) fn open_edit_form(&mut self, _tx: &Sender<Req>) {
+        let Some(item) = self.selected() else {
+            self.set_status("Nothing selected");
+            return;
+        };
+        // Read raw, NOT through `output::field`: that renders an absent value as
+        // "-" for display, and prefilling a form with "-" would send the string
+        // "-" as the new name the moment the user edits any other field.
+        let text = |pointer: &str| {
+            item.pointer(pointer)
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        };
+        let (id, name, owner) = (resource::id(item), text("/name"), text("/owner"));
+        self.form = Some(
+            Form::new(
+                FormKind::EditItem,
+                format!("Edit {id}"),
+                vec![
+                    Field::text("Name", &name).required(),
+                    Field::text("Owner", &owner),
+                ],
+            )
+            .about(id),
+        );
+    }
+
     pub(super) fn open_profile_form(&mut self, _tx: &Sender<Req>) {
         self.picker = None;
         self.form = Some(Form::new(
@@ -402,6 +436,24 @@ impl App {
                 self.add_profile =
                     Some((form.value("Name"), form.value("URL"), form.value("Token")));
             }
+            FormKind::EditItem => {
+                let Some(id) = form.subject.clone() else {
+                    return;
+                };
+                // Only what the user actually changed. `is_empty_edit` is the
+                // same check the CLI's `item set` makes, so both halves agree
+                // on what "nothing changed" means.
+                let body = resource::edit_body(
+                    form.changed("Name").as_deref(),
+                    form.changed("Owner").as_deref(),
+                );
+                if resource::is_empty_edit(&body) {
+                    self.set_status("Nothing changed");
+                    return;
+                }
+                self.set_status(format!("Updating {id}…"));
+                let _ = tx.send(Req::Update { id, body });
+            }
             FormKind::NewItem => {
                 let name = form.value("Name");
                 // Read through `visible()`, not straight off the field: a hidden
@@ -438,6 +490,7 @@ impl App {
         let mut items = vec![
             MenuItem::new("Open detail", App::open_detail),
             MenuItem::new("New item…", App::open_new_form),
+            MenuItem::new("Edit…", App::open_edit_form),
         ];
         items.push(MenuItem::new(
             if marked > 0 {

@@ -23,6 +23,12 @@ impl FieldKind {
 pub(super) struct Field {
     pub(super) label: &'static str,
     pub(super) value: String,
+    /// What the field held when the form opened.
+    ///
+    /// Kept so an edit can send only what actually changed — a property of the
+    /// form rather than a rule each submit path has to remember, which is how
+    /// one of them ends up sending a field the user never touched.
+    initial: String,
     pub(super) kind: FieldKind,
     pub(super) required: bool,
     /// Show conditions, AND-combined: (label of the deciding field, accepted
@@ -38,6 +44,7 @@ impl Field {
         Self {
             label,
             value: value.into(),
+            initial: value.into(),
             kind: FieldKind::Text,
             required: false,
             only_for: Vec::new(),
@@ -76,6 +83,7 @@ impl Field {
 #[derive(PartialEq, Clone, Copy)]
 pub(super) enum FormKind {
     NewItem,
+    EditItem,
     AddProfile,
 }
 
@@ -90,6 +98,12 @@ pub(super) struct Form {
     /// status line fades after a few seconds, which would erase the explanation
     /// while the user is still looking for the field it names.
     pub(super) error: Option<String>,
+    /// The id this form edits, when it edits something rather than creating it.
+    ///
+    /// Held beside the fields rather than inside `FormKind` so that enum stays
+    /// `Copy` — and so the id survives a refused submit, which puts the form
+    /// back on screen with what the user typed still in it.
+    pub(super) subject: Option<String>,
 }
 
 impl Form {
@@ -100,7 +114,14 @@ impl Form {
             fields,
             focus: 0,
             error: None,
+            subject: None,
         }
+    }
+
+    /// The object this form edits.
+    pub(super) fn about(mut self, id: impl Into<String>) -> Self {
+        self.subject = Some(id.into());
+        self
     }
 
     /// Indices of the fields shown right now.
@@ -116,6 +137,25 @@ impl Form {
             })
             .map(|(i, _)| i)
             .collect()
+    }
+
+    /// This field's value, but only if the user changed it.
+    ///
+    /// `None` and `Some("")` are different answers and must stay that way: the
+    /// first means "leave it alone", the second means "clear it". Collapsing
+    /// them is how an edit form quietly wipes a field nobody touched.
+    ///
+    /// A field hidden by a choice is never counted as changed — the user cannot
+    /// have edited what they could not see.
+    pub(super) fn changed(&self, label: &str) -> Option<String> {
+        let visible = self.visible();
+        self.fields
+            .iter()
+            .enumerate()
+            .find(|(i, f)| f.label == label && visible.contains(i))
+            .map(|(_, f)| f)
+            .filter(|f| f.value != f.initial)
+            .map(|f| f.value.clone())
     }
 
     pub(super) fn value(&self, label: &str) -> String {

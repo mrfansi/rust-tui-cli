@@ -39,6 +39,7 @@ pub(super) fn screen_keys(screen: Screen) -> &'static [Key] {
             Key("Enter", "detail"),
             Key("Space", "menu"),
             Key("n", "new"),
+            Key("e", "edit"),
             Key("v / V", "mark / mark all shown"),
             Key("x", "delete (marked, or this row)"),
             Key("↑↓", "select"),

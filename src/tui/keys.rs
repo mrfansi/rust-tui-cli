@@ -236,6 +236,10 @@ impl App {
                 self.set_status("Filter: type to narrow, Enter to keep, Esc to clear");
             }
             KeyCode::Char('n') => self.open_new_form(tx),
+            // The same method the menu's "Edit…" holds, never a second copy of
+            // its body — that is what stops a keybinding and a menu item from
+            // drifting into doing slightly different things.
+            KeyCode::Char('e') => self.open_edit_form(tx),
             KeyCode::Char('x') => self.ask_delete(tx),
             KeyCode::Char('v') => self.toggle_mark(),
             KeyCode::Char('V') => self.mark_all_shown(),

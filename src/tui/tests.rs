@@ -115,6 +115,52 @@ fn a_ctrl_shortcut_does_not_type_its_letter() {
     );
 }
 
+/// The edit form opens on the row the user is looking at, carrying that row's
+/// values — not an empty form they would have to retype.
+#[test]
+fn an_edit_form_opens_prefilled_from_the_selected_row() {
+    let (mut app, tx, _rx) = app(&[("web", "active"), ("db", "failed")]);
+    press(&mut app, &tx, KeyCode::Down); // select db
+    press(&mut app, &tx, KeyCode::Char('e'));
+
+    let form = app.form.as_ref().expect("e opens the edit form");
+    assert_eq!(form.value("Name"), "db");
+    assert_eq!(form.value("Owner"), "ops");
+    assert_eq!(form.subject.as_deref(), Some("db"));
+}
+
+/// Only what changed goes on the wire. Sending every field would overwrite the
+/// ones the form never showed with whatever it happened to be holding.
+#[test]
+fn an_edit_sends_only_the_fields_that_changed() {
+    let (mut app, tx, rx) = app(&[("web", "active")]);
+    press(&mut app, &tx, KeyCode::Char('e'));
+    // Change the owner, leave the name exactly as it was.
+    app.form.as_mut().unwrap().focus = 1;
+    typed(&mut app, &tx, "-2");
+    press(&mut app, &tx, KeyCode::Enter);
+
+    let Ok(Req::Update { id, body }) = rx.try_recv() else {
+        panic!("an update must have been sent");
+    };
+    assert_eq!(id, "web");
+    assert_eq!(body, serde_json::json!({ "owner": "ops-2" }));
+    assert!(body.get("name").is_none(), "an untouched field is not sent");
+}
+
+/// Submitting an edit nobody edited is a round trip that can only fail or do
+/// nothing, so it is refused before it is sent.
+#[test]
+fn an_edit_that_changed_nothing_sends_nothing() {
+    let (mut app, tx, rx) = app(&[("web", "active")]);
+    press(&mut app, &tx, KeyCode::Char('e'));
+    press(&mut app, &tx, KeyCode::Enter);
+
+    assert!(rx.try_recv().is_err(), "nothing may be sent");
+    assert_eq!(app.status, "Nothing changed");
+    assert!(app.form.is_none(), "and the form is done with");
+}
+
 #[test]
 fn mark_all_applies_to_what_the_filter_shows_and_toggles_off() {
     let (mut app, tx, _rx) = app(&[("web", "active"), ("db", "failed"), ("web-2", "active")]);
