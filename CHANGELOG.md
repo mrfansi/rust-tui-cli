@@ -3,6 +3,17 @@
 Notable changes, newest first. Format follows [Keep a Changelog]; versions
 follow [Semantic Versioning].
 
+## [Unreleased]
+
+### Added
+
+- A "Replace the demo resource" recipe in `ARCHITECTURE.md`: a file-by-file
+  table of the 125 lines the name `item` reaches, and the evidence for why a
+  `sed` cannot do it — `Item` is also `IntoIterator::Item`, ratatui's `ListItem`,
+  and this repo's own `MenuItem`. Replacing the demo is the first thing anyone
+  does here and it was the least documented.
+- A note that `rename.sh` needs Git Bash on Windows.
+
 ## [0.1.0] — 2026-07-28
 
 The first release. Everything below shipped in it: the "Fixed" entries repair

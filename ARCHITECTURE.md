@@ -107,6 +107,30 @@ Completions and the man page follow automatically.
    status bar — do not write a second list).
 5. An arm in `render::ui()` and one in `App::screen_key()`.
 
+### Replace the demo resource
+
+The first thing anyone does, and the one that touches the most files: `item`
+appears on 125 lines across 13 of the 15 modules. Work outwards from the domain,
+compiling as you go — each step below leaves the tree broken until the next one,
+and the compiler names exactly what is left.
+
+| Where | What to change |
+|---|---|
+| `resource.rs` | all of it: `PATH`, `HEADERS`, `row`, `id`, `health`, `create`, `new_body` |
+| `main.rs` | `Command::Item`, `enum ItemCmd` and its variants' flags |
+| `commands.rs` | `item_list` · `item_get` · `item_create` · `item_delete` |
+| `tui/worker.rs` | `Req::Items` · `Resp::Items` and their arms in `handle()` |
+| `tui/app.rs` | `Screen::Items` · `TABS` · `items` · `items_row` · `open_item_menu` · `FormKind::NewItem` · the fields in `open_new_form` |
+| `tui/keys.rs` | `items_key` |
+| `tui/render.rs` | `render_items` · the `Screen::Items` arm of `screen_keys` · the `min_widths` for your columns |
+| `tui/tests.rs`, `client.rs`, `examples/fake_api.rs` | the fixtures and the `/items` paths |
+
+**Do not do this with `sed`.** A case-aware substitution of `Item` was tried and
+it does not work: `Item` is also `IntoIterator::Item` in `filter.rs`, ratatui's
+`ListItem` in `render.rs`, and this repo's own `MenuItem` — which means "an item
+of a menu", not an object of your domain. Three foreign meanings of one word, and
+the first two do not even fail loudly in every case.
+
 ### Add a second resource
 
 Copy `resource.rs` to `deploy.rs` (or whatever it is), then:

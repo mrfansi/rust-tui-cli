@@ -49,7 +49,11 @@ lockfile, commits, and deletes itself. Nothing under `src/` is touched —
 follow the package on their own. Pass `--no-commit` to review it first.
 
 It deliberately does **not** rename the demo resource. That is a design
-decision, not a substitution: `ARCHITECTURE.md` has the recipe.
+decision, not a substitution — `ARCHITECTURE.md` has the recipe and the evidence.
+
+On Windows, run it from Git Bash (which ships with Git for Windows); it is a
+POSIX shell script, and PowerShell will not run it. Everything after the rename
+is plain `cargo`, and CI tests the suite on Windows.
 
 ## What you get
 
@@ -88,10 +92,11 @@ decision, not a substitution: `ARCHITECTURE.md` has the recipe.
 
 1. `./rename.sh <your-name>` — see above.
 2. Point `ApiClient` at your auth scheme (`src/client.rs` — one `send()`).
-3. Rewrite `src/resource.rs` for your object. It owns the route, the row, and
-   what a status *means*; nothing else knows any of that.
-4. Adjust the subcommands in `src/main.rs` and the screens in `src/tui/app.rs`.
-5. Rewrite this README's opening — `rename.sh` changes the title, not the prose.
+3. Replace the demo resource. `src/resource.rs` owns the route, the row, and
+   what a status *means*, but the name `item` reaches 13 of the 15 modules —
+   **ARCHITECTURE.md has the file-by-file table**, and the reason a `sed` will
+   not do it.
+4. Rewrite this README's opening — `rename.sh` changes the title, not the prose.
 
 `ARCHITECTURE.md` has the module map and the recipe for adding a screen or a
 second resource.
