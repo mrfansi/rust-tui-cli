@@ -10,6 +10,25 @@ It builds, it has 77 passing tests on Linux, macOS and Windows, and
 `cargo clippy --all-targets -- -D warnings` is clean. The demo domain is one
 resource called "item"; replacing it is the whole job.
 
+## See it working, without an API
+
+A fresh clone has no server to talk to, so start the fake one. Two terminals:
+
+```sh
+cargo run --example fake_api    # prints two export lines
+```
+
+```sh
+export RUST_TUI_CLI_URL=http://127.0.0.1:…    # paste what it printed
+export RUST_TUI_CLI_TOKEN=not-a-real-token
+cargo run                                     # the TUI, with data in it
+cargo run -- item list                        # and the CLI
+```
+
+Five rows, one of them carrying a status `resource.rs` does not recognise — so
+you can see that an unknown status is rendered grey rather than confidently
+green. `httpmock` is a dev-dependency, so none of this reaches a release build.
+
 ```
 cargo run -- --help          # the CLI
 cargo run                    # the TUI (no subcommand opens it)
@@ -61,7 +80,9 @@ decision, not a substitution: `ARCHITECTURE.md` has the recipe.
   it and the script are removed by the rename, so a copy never inherits them.
 - **Releases** — `git tag v0.1.0 && git push --tags` builds macOS (arm64, x64),
   Linux (gnu, musl) and Windows binaries and publishes them with the shell
-  completions, the man page, and a `SHA256SUMS`.
+  completions, the man page, and a `SHA256SUMS`. The tag must match `version` in
+  `Cargo.toml`, or the release is refused before anything is built — a binary
+  whose `--version` disagrees with its download is not worth shipping.
 
 ## Make it yours
 
