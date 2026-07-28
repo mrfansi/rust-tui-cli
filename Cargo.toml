@@ -1,0 +1,38 @@
+[package]
+name = "rust-tui-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Boilerplate for a Rust CLI + TUI: clap commands, ratatui dashboard, multi-profile store"
+license = "MIT"
+readme = "README.md"
+keywords = ["cli", "tui", "boilerplate", "ratatui", "template"]
+categories = ["command-line-utilities"]
+
+# Rename the package and the binary follows: APP_NAME is env!("CARGO_PKG_NAME"),
+# and the config directory is derived from it.
+[[bin]]
+name = "rust-tui-cli"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+clap_mangen = "0.3"
+# rustls, not native-tls: one TLS stack, no OpenSSL on the build machine.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+ratatui = "0.30"
+comfy-table = "7"
+regex = "1"
+dialoguer = "0.11"
+
+[dev-dependencies]
+httpmock = "0.7"
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
