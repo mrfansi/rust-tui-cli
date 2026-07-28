@@ -71,6 +71,13 @@ a tab through arithmetic this repo controls rather than a guess at the widget's
 defaults. `select_row_at` adds `TableState::offset()` for the same reason — skip
 it and every click past the first screenful selects the wrong row.
 
+**Overlays are drawn in the exact reverse of the order keys are consulted.**
+`on_key` checks help → confirm → form → menu → picker; `ui` draws picker → menu
+→ form → confirm → help. The overlay on top must be the one receiving the keys,
+or the user types into a dialog hidden behind the one they can see. Nothing
+fails today if the two drift — no path opens two overlays at once — which is
+exactly why both lists are written down next to each other.
+
 **The mouse cannot answer a question.** `on_mouse` returns immediately while any
 overlay is open. A deletion that a stray click could confirm is not confirmed.
 

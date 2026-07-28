@@ -27,6 +27,16 @@ follow [Semantic Versioning].
 
 ### Fixed
 
+- A table cell too wide for its column is cut with an ellipsis. The cut was made
+  at the whole table's width, so a fixed-width column was left to the widget,
+  which clips without a mark — `api-billing-prod` appeared as `api-billing-`, a
+  name that looks complete and is not.
+- A modifier makes a keypress a command, not a character. `Ctrl-U` in a filter
+  box or a form field used to insert a `u`.
+- Overlays are drawn in the exact reverse of the order `on_key` consults them,
+  so the dialog on top is always the one receiving the keys. The menu was drawn
+  over the form but ranked below it — unreachable today, and a trap for the next
+  screen someone adds.
 - The workflow that tests `rename.sh` lives in its own file and is deleted by
   the rename. As a job in `ci.yml` it was inherited by every project made from
   this template, where it could only fail — the script it runs has deleted
