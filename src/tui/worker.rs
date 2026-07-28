@@ -260,6 +260,6 @@ mod tests {
         };
         assert!(!error, "{message}");
         assert_eq!(message, format!("Deleted {n}"));
-        all.assert_hits(n);
+        all.assert_calls(n);
     }
 }

@@ -27,6 +27,8 @@ follow [Semantic Versioning].
 
 ### Fixed
 
+- `httpmock` moved to 0.8: `Mock::assert_hits` is deprecated there in favour of
+  `assert_calls`, and `-D warnings` makes a deprecation a build failure.
 - A table cell too wide for its column is cut with an ellipsis. The cut was made
   at the whole table's width, so a fixed-width column was left to the widget,
   which clips without a mark — `api-billing-prod` appeared as `api-billing-`, a

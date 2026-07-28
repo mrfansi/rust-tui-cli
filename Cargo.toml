@@ -35,7 +35,7 @@ dialoguer = "0.11"
 # Runs the built binary, so tests/cli.rs exercises the CLI a user actually gets
 # rather than the functions behind it.
 assert_cmd = "2"
-httpmock = "0.7"
+httpmock = "0.8"
 predicates = "3"
 tempfile = "3"
 
