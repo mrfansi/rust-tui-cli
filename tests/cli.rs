@@ -123,6 +123,47 @@ fn credentials_from_the_environment_reach_a_real_request() {
     assert_eq!(parsed[0]["id"], "i-1");
 }
 
+/// The update path, end to end: only the flag that was given reaches the wire.
+#[test]
+fn item_set_patches_only_what_was_asked_for() {
+    use httpmock::prelude::*;
+
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(PATCH)
+            .path("/items/i-1")
+            .json_body(serde_json::json!({ "owner": "data" }));
+        then.status(200)
+            .json_body(serde_json::json!({ "id": "i-1" }));
+    });
+
+    let dir = TempDir::new().unwrap();
+    cli(&dir)
+        .env(format!("{}_URL", env_prefix()), server.base_url())
+        .env(format!("{}_TOKEN", env_prefix()), "t")
+        .args(["item", "set", "i-1", "--owner", "data"])
+        .assert()
+        .success()
+        .stdout(contains("Updated"));
+    mock.assert();
+}
+
+/// `item set` with no flags must not reach the network at all: an empty PATCH
+/// can only fail or do nothing, and the user meant to change something.
+#[test]
+fn item_set_with_nothing_to_set_is_refused_before_any_request() {
+    let dir = TempDir::new().unwrap();
+    cli(&dir)
+        // A URL that nothing is listening on: if the command reaches the network
+        // this fails with a connection error instead of the message under test.
+        .env(format!("{}_URL", env_prefix()), "http://127.0.0.1:1")
+        .env(format!("{}_TOKEN", env_prefix()), "t")
+        .args(["item", "set", "i-1"])
+        .assert()
+        .failure()
+        .stderr(contains("Nothing to change"));
+}
+
 /// Half a pair is not a credential: with a URL but no token the tool must fall
 /// through to the profile store rather than send the default profile's token to
 /// whatever host the variable names.

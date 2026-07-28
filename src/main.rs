@@ -111,6 +111,17 @@ enum ItemCmd {
         #[arg(long)]
         image: Option<String>,
     },
+    /// Change an item's name or owner
+    ///
+    /// Named `set` to match `profile set`: one verb for "change what exists"
+    /// across the whole CLI, rather than `set` here and `edit` there.
+    Set {
+        id: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        owner: Option<String>,
+    },
     /// Delete an item
     Delete {
         id: String,
@@ -147,6 +158,7 @@ fn main() -> Result<()> {
                     owner,
                     image,
                 } => commands::item_create(&client, name, kind, owner, image),
+                ItemCmd::Set { id, name, owner } => commands::item_set(&client, &id, name, owner),
                 ItemCmd::Delete { id, yes } => commands::item_delete(&client, &id, yes),
             }
         }

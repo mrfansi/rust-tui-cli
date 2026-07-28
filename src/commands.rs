@@ -221,6 +221,28 @@ pub fn item_create(
     Ok(())
 }
 
+/// Change an item in place. Refused when nothing was given, for the same reason
+/// `profile set` refuses it: an empty PATCH is a round trip that can only fail
+/// or do nothing, and the user meant to change something.
+pub fn item_set(
+    client: &ApiClient,
+    id: &str,
+    name: Option<String>,
+    owner: Option<String>,
+) -> Result<()> {
+    let body = resource::edit_body(name.as_deref(), owner.as_deref());
+    if resource::is_empty_edit(&body) {
+        return Err(anyhow!("Nothing to change. Pass --name and/or --owner."));
+    }
+    let updated = resource::update(client, id, body)?;
+    if json_output() {
+        print_json(&updated);
+        return Ok(());
+    }
+    println!("Updated '{id}'.");
+    Ok(())
+}
+
 pub fn item_delete(client: &ApiClient, id: &str, yes: bool) -> Result<()> {
     // Destructive and irreversible: confirmed by default, skippable for scripts.
     if !yes
