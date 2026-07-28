@@ -29,11 +29,18 @@ project:
 
 ```
 rename.sh                 renames a fresh copy, then deletes itself
+tests/cli.rs              the CLI surface, exercised by running the binary
 rust-toolchain.toml       stable + rustfmt + clippy, so `cargo fmt` agrees with CI
-.github/workflows/ci.yml  lint · test on 3 OSes · MSRV · rename.sh
-.github/workflows/release.yml   a v* tag → five binaries + SHA256SUMS
+.github/workflows/ci.yml        lint · test on 3 OSes · MSRV
+.github/workflows/template.yml  runs rename.sh and checks the result
+.github/workflows/release.yml   a v* tag → five binaries, completions, man, SHA256SUMS
 CLAUDE.md                 the rules below, for an agent working in a copy
 ```
+
+`template.yml` and `rename.sh` are the two files that exist only because this is
+a template, and `rename.sh` deletes both. Anything else added for the template's
+benefit belongs in one of them, or it becomes something every copy inherits and
+nobody remembers to remove.
 
 ## The rules that make it scale
 

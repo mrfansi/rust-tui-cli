@@ -5,7 +5,10 @@ on:
   push:
     tags: ["v*"]
   # Runnable by hand against a tag, for when a release job failed on something
-  # that had nothing to do with the code.
+  # that had nothing to do with the code. Dispatching it on a BRANCH cannot
+  # publish anything: `gh release create --verify-tag` below refuses a ref that
+  # is not a tag, so the mistake fails instead of producing a release named
+  # after a branch.
   workflow_dispatch:
 
 env:

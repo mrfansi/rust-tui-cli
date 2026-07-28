@@ -13,8 +13,9 @@ follow [Semantic Versioning].
 - A test that runs `Cli::command().debug_assert()`, so a malformed clap
   definition fails in CI rather than in front of whoever adds a subcommand.
 - Releases carry the shell completions and the man page alongside the binaries.
-- `rename.sh`: renames a fresh copy of the template and deletes itself. Covered
-  by a CI job, so the path a new user takes is tested rather than assumed.
+- `rename.sh`: renames a fresh copy of the template and deletes itself, along
+  with the workflow that tests it. Covered by that workflow, so the path a new
+  user takes is tested rather than assumed.
 - Credentials from the environment: `<APP>_URL` and `<APP>_TOKEN` are used when
   both are set and no `--profile` was given, so CI runs need no credentials file
   on disk.
@@ -26,6 +27,10 @@ follow [Semantic Versioning].
 
 ### Fixed
 
+- The workflow that tests `rename.sh` lives in its own file and is deleted by
+  the rename. As a job in `ci.yml` it was inherited by every project made from
+  this template, where it could only fail — the script it runs has deleted
+  itself by then, so a new project's first push went red for no reason.
 - Mouse capture is turned off when the TUI panics. `ratatui::init()`'s hook
   leaves raw mode and the alternate screen, but the capture was enabled by this
   crate, so nothing switched it off — leaving the user's shell answering every

@@ -56,10 +56,12 @@ decision, not a substitution: `ARCHITECTURE.md` has the recipe.
   polling) so a slow API never freezes the interface, and bulk actions fan out
   across scoped threads instead of one round trip at a time.
 - **CI** — `fmt --check` and `clippy -D warnings` once, `test` on Linux, macOS
-  and Windows, a build at the declared MSRV, and a job that runs `rename.sh` on
-  a clean checkout so the template's own path stays tested.
+  and Windows, and a build at the declared MSRV. A separate workflow runs
+  `rename.sh` on a clean checkout so the template's own path stays tested; both
+  it and the script are removed by the rename, so a copy never inherits them.
 - **Releases** — `git tag v0.1.0 && git push --tags` builds macOS (arm64, x64),
-  Linux (gnu, musl) and Windows binaries and publishes them with a `SHA256SUMS`.
+  Linux (gnu, musl) and Windows binaries and publishes them with the shell
+  completions, the man page, and a `SHA256SUMS`.
 
 ## Make it yours
 
